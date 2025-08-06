@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Emotion Detector</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <style>
+    body { text-align: center; font-family: Arial; background: #f0f0f0; }
+    video, canvas { border: 1px solid black; margin-top: 20px; }
+    #suggestion { margin-top: 20px; font-size: 1.2em; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>Real-Time Emotion Detection</h1>
+  <video id="video" width="640" height="480" autoplay muted></video>
+  <canvas id="overlay" width="640" height="480"></canvas>
+  <div id="suggestion">Emotion Suggestions will appear here</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const context = overlay.getContext('2d');
+    const suggestionBox = document.getElementById('suggestion');
+
+    const emotionSolutions = {
+      angry: "Try some deep breaths or step away to cool down.",
+      sad: "Talk to a friend or listen to your favorite music.",
+      fearful: "You are safe. Ground yourself in the present.",
+      disgusted: "Focus on something positive or uplifting.",
+    };
+
+    async function setup() {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
+      await faceapi.nets.faceExpressionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models');
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+
+      video.addEventListener('play', () => {
+        const displaySize = { width: video.width, height: video.height };
+        faceapi.matchDimensions(overlay, displaySize);
+
+        setInterval(async () => {
+          const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+            .withFaceExpressions();
+
+          context.clearRect(0, 0, overlay.width, overlay.height);
+
+          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+          faceapi.draw.drawDetections(overlay, resizedDetections);
+          faceapi.draw.drawFaceExpressions(overlay, resizedDetections);
+
+          if (detections.length > 0) {
+            const expressions = detections[0].expressions;
+            const maxEmotion = Object.keys(expressions).reduce((a, b) =>
+              expressions[a] > expressions[b] ? a : b
+            );
+
+            if (emotionSolutions[maxEmotion]) {
+              suggestionBox.innerText = `You seem ${maxEmotion}. Tip: ${emotionSolutions[maxEmotion]}`;
+            } else {
+              suggestionBox.innerText = `You seem ${maxEmotion}. Keep it up! 😊`;
+            }
+          }
+        }, 500);
+      });
+    }
+
+    setup();
+  </script>
+</body>
+</html>
