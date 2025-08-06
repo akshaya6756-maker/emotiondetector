@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Emotion Detector - GitHub Pages</title>
+  <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.9.0"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js"></script>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #f8f8f8;
+    }
+    video, canvas {
+      margin-top: 20px;
+      border: 1px solid #333;
+    }
+    #suggestion {
+      margin-top: 20px;
+      font-size: 1.2em;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Real-Time Emotion Detection</h1>
+  <video id="video" width="640" height="480" autoplay muted></video>
+  <canvas id="overlay" width="640" height="480"></canvas>
+  <div id="suggestion">Detected emotion and tips will show here</div>
+
+  <script>
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const context = overlay.getContext('2d');
+    const suggestionBox = document.getElementById('suggestion');
+
+    const emotionSolutions = {
+      angry: "Try deep breathing or take a break.",
+      sad: "Talk to a friend or listen to calming music.",
+      fearful: "You are safe. Focus on the present.",
+      disgusted: "Shift your focus to something positive.",
+    };
+
+    async function startVideo() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("Camera access blocked or not available.");
+        console.error(err);
+      }
+    }
+
+    async function loadModels() {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('models');
+      await faceapi.nets.faceExpressionNet.loadFromUri('models');
+    }
+
+    async function onPlay() {
+      const displaySize = { width: video.width, height: video.height };
+      faceapi.matchDimensions(overlay, displaySize);
+
+      setInterval(async () => {
+        const detections = await faceapi.detectAllFaces(
+          video,
+          new faceapi.TinyFaceDetectorOptions()
+        ).withFaceExpressions();
+
+        context.clearRect(0, 0, overlay.width, overlay.height);
+
+        const resized = faceapi.resizeResults(detections, displaySize);
+        faceapi.draw.drawDetections(overlay, resized);
+        faceapi.draw.drawFaceExpressions(overlay, resized);
+
+        if (detections.length > 0) {
+          const expressions = detections[0].expressions;
+          const maxEmotion = Object.keys(expressions).reduce((a, b) =>
+            expressions[a] > expressions[b] ? a : b
+          );
+
+          if (emotionSolutions[maxEmotion]) {
+            suggestionBox.innerText = `You seem ${maxEmotion}. Tip: ${emotionSolutions[maxEmotion]}`;
+          } else {
+            suggestionBox.innerText = `You seem ${maxEmotion}. Keep smiling! 😊`;
+          }
+        }
+      }, 700);
+    }
+
+    // Init
+    window.addEventListener('load', async () => {
+      await loadModels();
+      await startVideo();
+      video.addEventListener('play', onPlay);
+    });
+  </script>
+</body>
+</html>
